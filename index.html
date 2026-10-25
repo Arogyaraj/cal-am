@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bucket List</title>
+<meta name="description" content="Plan, track and celebrate your bucket list.">
+<meta name="theme-color" content="#6366f1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Bucket List">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="avatar" id="avatar" title="Edit profile">?</div>
+    <div class="who" title="Edit profile">
+      <h1 id="name">Your Name</h1>
+      <p class="tag" id="tagline"></p>
+    </div>
+    <div class="top-actions">
+      <button class="btn ghost hide" id="installBtn">Install</button>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+      <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
+    </div>
+  </header>
+
+  <section class="card hero">
+    <div class="ring">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="track" cx="60" cy="60" r="52"/>
+        <circle class="fill" id="ringFill" cx="60" cy="60" r="52"/>
+      </svg>
+      <b id="ringPct">0%</b>
+    </div>
+    <div class="stats">
+      <div><b id="sTotal">0</b><span>Dreams</span></div>
+      <div><b id="sDone">0</b><span>Done</span></div>
+      <div><b id="sLeft">0</b><span>Left</span></div>
+    </div>
+  </section>
+
+  <div class="controls">
+    <input class="search" id="search" type="search" placeholder="Search dreams…" aria-label="Search">
+    <select id="sort" aria-label="Sort">
+      <option value="priority">Priority</option>
+      <option value="date">Target date</option>
+      <option value="added">Recently added</option>
+      <option value="name">Name</option>
+    </select>
+  </div>
+  <div class="chips" id="cats"></div>
+  <div class="seg" id="status">
+    <button class="on" data-s="all">All</button>
+    <button data-s="todo">To do</button>
+    <button data-s="done">Done</button>
+  </div>
+
+  <main class="list" id="list"></main>
+</div>
+
+<button class="btn fab" id="addBtn">+ Add dream</button>
+
+<dialog id="itemDlg">
+  <form class="dlg" id="itemForm">
+    <h2 id="itemTitle">New dream</h2>
+    <label>What do you want to do?<input class="field" name="title" required maxlength="120"></label>
+    <div class="row2">
+      <label>Category
+        <select class="field" name="category">
+          <option>Travel</option><option>Adventure</option><option>Learning</option>
+          <option>Health</option><option>Career</option><option>Creative</option>
+          <option>Food</option><option>Experiences</option><option>Other</option>
+        </select>
+      </label>
+      <label>Priority
+        <select class="field" name="priority">
+          <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+        </select>
+      </label>
+    </div>
+    <div class="row2">
+      <label>Target date<input class="field" type="date" name="date"></label>
+      <label>Budget<input class="field" name="budget" placeholder="e.g. $2,000" maxlength="40"></label>
+    </div>
+    <label>Location<input class="field" name="location" maxlength="120"></label>
+    <label>Notes<textarea class="field" name="notes" rows="2"></textarea></label>
+    <label>Steps (one per line)<textarea class="field" name="steps" rows="3" placeholder="Check flights&#10;Book a hotel"></textarea></label>
+    <div class="photo-box">
+      <div class="photo-prev" id="photoPrev">No photo</div>
+      <div class="photo-btns">
+        <label class="btn ghost">Choose photo<input type="file" id="photoInput" accept="image/*" hidden></label>
+        <button type="button" class="btn ghost hide" id="removePhoto">Remove photo</button>
+      </div>
+    </div>
+    <div class="actions-row">
+      <button type="button" class="btn danger grow hide" id="deleteItemBtn">Delete</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button class="btn" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="profileDlg">
+  <form class="dlg" id="profileForm">
+    <h2>Edit profile</h2>
+    <label>Name<input class="field" name="name" required maxlength="60"></label>
+    <label>Tagline<input class="field" name="tagline" maxlength="120"></label>
+    <div class="photo-box">
+      <div class="photo-prev" id="profPrev">No photo</div>
+      <div class="photo-btns">
+        <label class="btn ghost">Choose photo<input type="file" id="profPhotoInput" accept="image/*" hidden></label>
+        <button type="button" class="btn ghost" id="profRemove">Remove photo</button>
+      </div>
+    </div>
+    <div class="actions-row">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button class="btn" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="menuDlg">
+  <div class="dlg">
+    <h2>Menu</h2>
+    <nav class="menu">
+      <button data-m="random">🎲 Random dream</button>
+      <button data-m="share">🔗 Share list</button>
+      <button data-m="json">⬇ Export backup (JSON)</button>
+      <button data-m="csv">⬇ Export spreadsheet (CSV)</button>
+      <button data-m="import">⬆ Import backup</button>
+      <button data-m="erase" class="danger-text">Erase everything</button>
+    </nav>
+    <p class="muted">Shortcuts: N new · / search · R random · T theme</p>
+    <div class="actions-row"><button class="btn ghost" data-close>Close</button></div>
+  </div>
+</dialog>
+
+<dialog id="randDlg">
+  <div class="dlg">
+    <small class="muted">Your next adventure</small>
+    <h2 id="randTitle"></h2>
+    <p class="muted" id="randMeta"></p>
+    <div class="actions-row">
+      <button class="btn ghost" data-close>Close</button>
+      <button class="btn ghost" id="randAgain">Another</button>
+      <button class="btn" id="randOpen">Open</button>
+    </div>
+  </div>
+</dialog>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<div class="toast" id="toast">
+  <span id="toastMsg"></span>
+  <button id="toastAct" class="hide"></button>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>
