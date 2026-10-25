@@ -218,3 +218,18 @@ textarea.field{resize:vertical}
   .dock button{min-width:58px;padding:6px 10px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* Lock screen and sync status */
+.lock{display:none;position:fixed;inset:0;place-items:center;padding:20px;background:var(--bg);z-index:50}
+body.locked .lock{display:grid}
+body.locked .app,body.locked .dock,body.locked .toast{display:none!important}
+.lock-card{width:min(360px,100%);padding:28px;text-align:center;display:grid;gap:12px;justify-items:center}
+.lock-card .field{width:100%}
+.lock-ico{font-size:36px}
+.lock-card h2{margin:0}
+.pin-input{text-align:center;font-size:24px;letter-spacing:.3em}
+.lock-err{color:var(--danger);min-height:1.2em;margin:0;font-size:14px}
+.sync{font-size:12px;color:var(--muted);white-space:nowrap;min-width:0}
+.sync.error{color:var(--danger)}
+.sync.saved{color:var(--done)}
+@media (max-width:640px){.sync{display:none}}

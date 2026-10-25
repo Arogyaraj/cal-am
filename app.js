@@ -1,6 +1,4 @@
 /* Bucket List: app logic, no dependencies */
-const KEY = "bucketlist-v3";
-const LEGACY_KEYS = ["bucketlist-v2"];
 const THEME_KEY = "bucketlist-theme";
 const CATS = ["Travel","Adventure","Learning","Health","Career","Creative","Food","Experiences","Other"];
 const EMOJI = { Travel:"✈️", Adventure:"🏔️", Learning:"📚", Health:"💪", Career:"💼", Creative:"🎨", Food:"🍜", Experiences:"🎉", Other:"⭐" };
@@ -89,33 +87,51 @@ function normalize(data) {
   return { profile, settings, items };
 }
 
-function load() {
-  for (const key of [KEY, ...LEGACY_KEYS]) {
-    try {
-      const s = JSON.parse(localStorage.getItem(key));
-      if (s && s.profile && Array.isArray(s.items)) return normalize(s);
-    } catch {}
-  }
+/* ---------- Data: saved in Vercel Postgres through /api/state, behind a PIN ---------- */
+const LEGACY_KEYS = ["bucketlist-v3", "bucketlist-v2"];   // old local copies, migrated once
+const PIN_KEY = "bl-pin";                                  // sessionStorage: cleared when the tab closes
+let pin = sessionStorage.getItem(PIN_KEY) || "";
+let state = null;
+let dirty = false, saving = false, saveTimer = null, legacyToClear = false;
+
+function seedState() {
   return normalize({ ...structuredClone(SAMPLE), items: SAMPLE.items.map((i) => ({ ...structuredClone(i), added: Date.now() - 864e5 * 30 })) });
 }
 
-let state = load();
-let currentTab = "dreams";
-let filter = { cat: "All", status: "all", q: "", sort: "priority" };
-let editing = null;
-let pendingPhoto;
-let profPhoto;
-let randomId = null;
-let deferredPrompt = null;
-
-function save() {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(state));
-    return true;
-  } catch {
-    toast("Storage is full. Export a backup and remove some photos.");
-    return false;
+function readLegacy() {
+  for (const key of LEGACY_KEYS) {
+    try {
+      const s = JSON.parse(localStorage.getItem(key));
+      if (s && s.profile && Array.isArray(s.items)) return { data: normalize(s) };
+    } catch {}
   }
+  return null;
+}
+
+async function api(method, body, pinValue) {
+  let res;
+  try {
+    res = await fetch("/api/state", {
+      method,
+      headers: { "Content-Type": "application/json", "x-pin": pinValue },
+      body: body ? JSON.stringify(body) : undefined,
+      cache: "no-store"
+    });
+  } catch {
+    throw Object.assign(new Error("Can't reach the server. Check your connection."), { code: 0 });
+  }
+  if (res.status === 401) throw Object.assign(new Error("Wrong PIN"), { code: 401 });
+  if (res.status === 429) throw Object.assign(new Error("Too many attempts. Wait 15 minutes."), { code: 429 });
+  if (res.status === 413) throw Object.assign(new Error("Too large to save. Remove a few photos."), { code: 413 });
+  if (!res.ok) throw Object.assign(new Error("Server error"), { code: res.status });
+  return res.json();
+}
+
+function setSync(status, msg = "") {
+  const el = $("sync");
+  el.className = "sync " + status;
+  el.textContent = { saving: "Saving…", saved: "Saved", error: "Not saved, retrying", idle: "" }[status] || "";
+  el.title = msg;
 }
 
 let toastTimer;
@@ -448,7 +464,7 @@ $("journal").addEventListener("click", (e) => {
 function toggleDone(item) {
   item.done = !item.done;
   item.completedAt = item.done ? Date.now() : 0;
-  if (!save()) return;
+  save();
   render();
   if (item.done) {
     confetti();
@@ -538,7 +554,7 @@ $("itemForm").addEventListener("submit", (e) => {
   const wasEdit = !!editing;
   if (editing) Object.assign(editing, data);
   else state.items.unshift(newItem(data));
-  if (!save()) return;
+  save();
   $("itemDlg").close();
   render();
   toast(wasEdit ? "Saved" : "Dream added ✨");
@@ -599,7 +615,7 @@ $("profileForm").addEventListener("submit", (e) => {
     tagline: f.elements.tagline.value.trim(),
     photo: profPhoto !== undefined ? profPhoto : state.profile.photo || ""
   };
-  if (!save()) return;
+  save();
   $("profileDlg").close();
   render();
 });
@@ -764,13 +780,13 @@ function compressImage(file) {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 800 / Math.max(img.width, img.height));
+      const scale = Math.min(1, 640 / Math.max(img.width, img.height));
       const c = document.createElement("canvas");
       c.width = Math.round(img.width * scale);
       c.height = Math.round(img.height * scale);
       c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL("image/jpeg", 0.8));
+      resolve(c.toDataURL("image/jpeg", 0.7));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("bad image")); };
     img.src = url;
@@ -819,6 +835,7 @@ $("installBtn").onclick = async () => {
 /* ---------- Keyboard shortcuts ---------- */
 document.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (document.body.classList.contains("locked")) return;
   if (document.querySelector("dialog[open]")) return;
   if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   const k = e.key.toLowerCase();
@@ -831,14 +848,47 @@ document.addEventListener("keydown", (e) => {
   else if (k === "3") setTab("stats");
 });
 
-/* ---------- Init ---------- */
-initTheme();
-render();
-setTab("dreams");
-if (new URLSearchParams(location.search).has("new")) {
-  history.replaceState(null, "", location.pathname);
-  openItem(null);
+/* ---------- Start ---------- */
+function lockError(msg) { $("lockErr").textContent = msg || ""; }
+
+$("lockForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const p = $("pinInput").value.trim();
+  if (!p) return;
+  $("lockBtn").disabled = true;
+  lockError("");
+  try {
+    await unlock(p);
+    $("pinInput").value = "";
+  } catch (err) {
+    lockError(err.code === 401 ? "Wrong PIN" : err.message);
+    $("pinInput").select();
+    await new Promise((r) => setTimeout(r, 700));
+  } finally {
+    $("lockBtn").disabled = false;
+  }
+});
+
+async function boot() {
+  if (!pin) return;
+  try {
+    await unlock(pin);
+  } catch (err) {
+    pin = "";
+    if (err.code === 401) sessionStorage.removeItem(PIN_KEY);
+    lockError(err.code === 401 ? "Your PIN has changed. Enter it again." : err.message);
+  }
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && dirty) {
+    clearTimeout(saveTimer);
+    flush();
+  }
+});
+
+initTheme();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
 }
+boot();
