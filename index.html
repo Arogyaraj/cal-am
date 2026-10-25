@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bucket List</title>
-<meta name="description" content="Plan, track and celebrate your bucket list.">
+<meta name="description" content="Plan, track and celebrate the things you want to do.">
 <meta name="theme-color" content="#6366f1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,55 +15,90 @@
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<div class="wrap">
+<div class="app">
+
   <header class="top">
-    <div class="avatar" id="avatar" title="Edit profile">?</div>
-    <div class="who" title="Edit profile">
+    <button class="avatar" id="avatar" aria-label="Edit profile">?</button>
+    <button class="who" id="who" aria-label="Edit profile">
       <h1 id="name">Your Name</h1>
       <p class="tag" id="tagline"></p>
-    </div>
+    </button>
     <div class="top-actions">
-      <button class="btn ghost hide" id="installBtn">Install</button>
+      <button class="pill-btn hide" id="installBtn">Install</button>
       <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
       <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
     </div>
   </header>
 
-  <section class="card hero">
-    <div class="ring">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <circle class="track" cx="60" cy="60" r="52"/>
-        <circle class="fill" id="ringFill" cx="60" cy="60" r="52"/>
-      </svg>
-      <b id="ringPct">0%</b>
+  <!-- DREAMS -->
+  <section class="view" id="view-dreams">
+    <section class="card hero">
+      <div class="hero-top">
+        <div class="ring">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="track" cx="60" cy="60" r="52"/>
+            <circle class="fill" id="ringFill" cx="60" cy="60" r="52"/>
+          </svg>
+          <b id="ringPct">0%</b>
+        </div>
+        <div class="stats">
+          <div><b id="sTotal">0</b><span>Dreams</span></div>
+          <div><b id="sDone">0</b><span>Done</span></div>
+          <div><b id="sLeft">0</b><span>Left</span></div>
+        </div>
+      </div>
+      <p class="quote" id="quote"></p>
+    </section>
+
+    <form class="quick" id="quickForm">
+      <input id="quick" placeholder="Add a dream and press Enter…" maxlength="120" aria-label="Quick add">
+      <button class="btn" type="submit">Add</button>
+    </form>
+
+    <div class="toolbar">
+      <input class="search" id="search" type="search" placeholder="Search title, tag, place…" aria-label="Search">
+      <select id="sort" aria-label="Sort">
+        <option value="priority">Priority</option>
+        <option value="date">Target date</option>
+        <option value="added">Recently added</option>
+        <option value="name">Name</option>
+      </select>
+      <div class="seg-icons" role="group" aria-label="View">
+        <button data-view="grid" aria-label="Grid view">▦</button>
+        <button data-view="list" aria-label="List view">☰</button>
+      </div>
     </div>
-    <div class="stats">
-      <div><b id="sTotal">0</b><span>Dreams</span></div>
-      <div><b id="sDone">0</b><span>Done</span></div>
-      <div><b id="sLeft">0</b><span>Left</span></div>
+
+    <div class="chips" id="cats"></div>
+    <div class="seg" id="status">
+      <button class="on" data-s="all">All</button>
+      <button data-s="todo">To do</button>
+      <button data-s="done">Done</button>
     </div>
+
+    <main class="list" id="list"></main>
   </section>
 
-  <div class="controls">
-    <input class="search" id="search" type="search" placeholder="Search dreams…" aria-label="Search">
-    <select id="sort" aria-label="Sort">
-      <option value="priority">Priority</option>
-      <option value="date">Target date</option>
-      <option value="added">Recently added</option>
-      <option value="name">Name</option>
-    </select>
-  </div>
-  <div class="chips" id="cats"></div>
-  <div class="seg" id="status">
-    <button class="on" data-s="all">All</button>
-    <button data-s="todo">To do</button>
-    <button data-s="done">Done</button>
-  </div>
+  <!-- JOURNAL -->
+  <section class="view hide" id="view-journal">
+    <h2 class="page-title">Journal</h2>
+    <p class="muted page-sub">Everything you've finished, with the memories attached.</p>
+    <div id="journal"></div>
+  </section>
 
-  <main class="list" id="list"></main>
+  <!-- STATS -->
+  <section class="view hide" id="view-stats">
+    <h2 class="page-title">Stats</h2>
+    <div id="stats"></div>
+  </section>
 </div>
 
-<button class="btn fab" id="addBtn">+ Add dream</button>
+<nav class="dock" id="dock" aria-label="Main">
+  <button data-tab="dreams" class="on"><span class="ico">🏠</span><span>Dreams</span></button>
+  <button class="add" id="fabAdd" aria-label="Add dream">+</button>
+  <button data-tab="journal"><span class="ico">📖</span><span>Journal</span></button>
+  <button data-tab="stats"><span class="ico">📊</span><span>Stats</span></button>
+</nav>
 
 <dialog id="itemDlg">
   <form class="dlg" id="itemForm">
@@ -88,8 +123,11 @@
       <label>Budget<input class="field" name="budget" placeholder="e.g. $2,000" maxlength="40"></label>
     </div>
     <label>Location<input class="field" name="location" maxlength="120"></label>
+    <label>Link<input class="field" name="url" type="url" placeholder="https://" maxlength="300"></label>
+    <label>Tags (comma separated)<input class="field" name="tags" placeholder="beach, summer, friends" maxlength="200"></label>
     <label>Notes<textarea class="field" name="notes" rows="2"></textarea></label>
-    <label>Steps (one per line)<textarea class="field" name="steps" rows="3" placeholder="Check flights&#10;Book a hotel"></textarea></label>
+    <label>Steps (one per line)<textarea class="field" name="steps" rows="3" placeholder="Check flight dates&#10;Book a hotel"></textarea></label>
+    <label>Memory, once it's done<textarea class="field" name="memory" rows="3" placeholder="How did it feel? What will you remember?"></textarea></label>
     <div class="photo-box">
       <div class="photo-prev" id="photoPrev">No photo</div>
       <div class="photo-btns">
@@ -98,7 +136,9 @@
       </div>
     </div>
     <div class="actions-row">
-      <button type="button" class="btn danger grow hide" id="deleteItemBtn">Delete</button>
+      <button type="button" class="btn danger hide" id="deleteItemBtn">Delete</button>
+      <button type="button" class="btn ghost hide" id="dupItemBtn">Duplicate</button>
+      <span class="grow"></span>
       <button type="button" class="btn ghost" data-close>Cancel</button>
       <button class="btn" type="submit">Save</button>
     </div>
@@ -135,7 +175,11 @@
       <button data-m="import">⬆ Import backup</button>
       <button data-m="erase" class="danger-text">Erase everything</button>
     </nav>
-    <p class="muted">Shortcuts: N new · / search · R random · T theme</p>
+    <div>
+      <p class="muted">Accent color</p>
+      <div class="swatches" id="swatches"></div>
+    </div>
+    <p class="muted">Shortcuts: N new · / search · R random · T theme · 1 2 3 tabs</p>
     <div class="actions-row"><button class="btn ghost" data-close>Close</button></div>
   </div>
 </dialog>
@@ -155,7 +199,7 @@
 
 <input type="file" id="importFile" accept="application/json,.json" hidden>
 
-<div class="toast" id="toast">
+<div class="toast" id="toast" role="status">
   <span id="toastMsg"></span>
   <button id="toastAct" class="hide"></button>
 </div>
