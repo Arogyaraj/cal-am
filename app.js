@@ -134,6 +134,60 @@ function setSync(status, msg = "") {
   el.title = msg;
 }
 
+function save() {
+  dirty = true;
+  setSync("saving");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 600);
+}
+
+async function flush() {
+  if (!dirty || saving || !pin) return;
+  saving = true;
+  dirty = false;
+  try {
+    await api("PUT", state, pin);
+    setSync("saved");
+    if (legacyToClear) {
+      LEGACY_KEYS.forEach((k) => localStorage.removeItem(k));
+      legacyToClear = false;
+    }
+  } catch (err) {
+    if (err.code === 401) {
+      sessionStorage.removeItem(PIN_KEY);
+      location.reload();
+      return;
+    }
+    dirty = err.code !== 413;   // a too-large save won't succeed on retry
+    setSync("error", err.message);
+  } finally {
+    saving = false;
+    if (dirty) saveTimer = setTimeout(flush, 2000);
+  }
+}
+
+async function unlock(p) {
+  const data = await api("GET", null, p);
+  pin = p;
+  sessionStorage.setItem(PIN_KEY, p);
+  if (data.state) {
+    state = normalize(data.state);
+    setSync("idle");
+  } else {
+    const legacy = readLegacy();
+    state = legacy ? legacy.data : seedState();
+    legacyToClear = !!legacy;
+    save();
+  }
+  document.body.classList.remove("locked");
+  render();
+  setTab(currentTab);
+  if (new URLSearchParams(location.search).has("new")) {
+    history.replaceState(null, "", location.pathname);
+    openItem(null);
+  }
+}
+
 let toastTimer;
 function toast(msg, action) {
   $("toastMsg").textContent = msg;
