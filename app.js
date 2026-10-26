@@ -688,6 +688,9 @@ $("nextUp").addEventListener("click", () => {
   if (d) openItem(d);
 });
 $("fabAdd").onclick = () => openItem(null);
+document.querySelectorAll("[data-tab]").forEach((b) =>
+  b.addEventListener("click", () => setTab(b.dataset.tab))
+);
 
 /* ---------- Item dialog ---------- */
 function renderPhotoPreview(src) {
@@ -1011,7 +1014,6 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 let deferredPrompt = null;
 window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
   deferredPrompt = e;
   $("installBtn").classList.remove("hide");
 });
