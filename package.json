@@ -1,8 +1,9 @@
 {
   "name": "bucket-list",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
+    "pg": "^8.13.0"
   }
 }

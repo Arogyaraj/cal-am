@@ -5,38 +5,51 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bucket List</title>
 <meta name="description" content="Plan, track and celebrate the things you want to do.">
-<meta name="theme-color" content="#6366f1">
+<meta name="theme-color" content="#ff6b6b">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Bucket List">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="locked">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" style="stop-color:var(--accent)"/>
+      <stop offset="1" style="stop-color:var(--accent2)"/>
+    </linearGradient>
+  </defs>
+</svg>
+
 <section id="lock" class="lock" aria-live="polite">
   <form class="lock-card card" id="lockForm">
     <div class="lock-ico">🔒</div>
     <h2>Enter your PIN</h2>
-    <p class="muted">Your bucket list is saved privately to the database.</p>
+    <p class="muted">Your list lives in the database and opens only with your PIN.</p>
     <input id="pinInput" class="field pin-input" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="••••" required>
     <p class="lock-err" id="lockErr"></p>
     <button class="btn" id="lockBtn" type="submit">Unlock</button>
   </form>
 </section>
-<div class="app">
 
+<div class="app">
   <header class="top">
     <button class="avatar" id="avatar" aria-label="Edit profile">?</button>
     <button class="who" id="who" aria-label="Edit profile">
+      <span class="hello" id="hello">Hey,</span>
       <h1 id="name">Your Name</h1>
-      <p class="tag" id="tagline"></p>
     </button>
     <div class="top-actions">
       <span class="sync" id="sync"></span>
       <button class="pill-btn hide" id="installBtn">Install</button>
-      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle light or dark">◐</button>
       <button class="icon-btn" id="menuBtn" aria-label="Menu">⋯</button>
     </div>
   </header>
@@ -44,7 +57,7 @@
   <!-- DREAMS -->
   <section class="view" id="view-dreams">
     <section class="card hero">
-      <div class="hero-top">
+      <div class="hero-grid">
         <div class="ring">
           <svg viewBox="0 0 120 120" aria-hidden="true">
             <circle class="track" cx="60" cy="60" r="52"/>
@@ -52,13 +65,20 @@
           </svg>
           <b id="ringPct">0%</b>
         </div>
-        <div class="stats">
-          <div><b id="sTotal">0</b><span>Dreams</span></div>
-          <div><b id="sDone">0</b><span>Done</span></div>
-          <div><b id="sLeft">0</b><span>Left</span></div>
+        <div class="hero-copy">
+          <p class="tag" id="tagline"></p>
+          <div class="stats">
+            <div><b id="sTotal">0</b><span>Dreams</span></div>
+            <div><b id="sDone">0</b><span>Done</span></div>
+            <div><b id="sLeft">0</b><span>Left</span></div>
+          </div>
+          <div class="goal hide" id="goal">
+            <div class="goal-top"><span id="goalLabel">Goal</span><b id="goalTxt"></b></div>
+            <div class="goal-bar"><i id="goalFill"></i></div>
+          </div>
         </div>
       </div>
-      <p class="quote" id="quote"></p>
+      <button class="next hide" id="nextUp"></button>
     </section>
 
     <form class="quick" id="quickForm">
@@ -66,8 +86,17 @@
       <button class="btn" type="submit">Add</button>
     </form>
 
+    <div class="chips" id="cats"></div>
+    <div class="chips hide" id="tagChips"></div>
+
     <div class="toolbar">
       <input class="search" id="search" type="search" placeholder="Search title, tag, place…" aria-label="Search">
+      <select id="prio" aria-label="Priority filter">
+        <option value="all">Any priority</option>
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
       <select id="sort" aria-label="Sort">
         <option value="priority">Priority</option>
         <option value="date">Target date</option>
@@ -75,16 +104,18 @@
         <option value="name">Name</option>
       </select>
       <div class="seg-icons" role="group" aria-label="View">
-        <button data-view="grid" aria-label="Grid view">▦</button>
-        <button data-view="list" aria-label="List view">☰</button>
+        <button data-view="grid" aria-label="Grid view" title="Grid">▦</button>
+        <button data-view="list" aria-label="List view" title="List">☰</button>
+        <button data-view="timeline" aria-label="Timeline view" title="Timeline">⏱</button>
       </div>
+      <button class="pill-toggle" id="selectBtn">Select</button>
     </div>
 
-    <div class="chips" id="cats"></div>
     <div class="seg" id="status">
       <button class="on" data-s="all">All</button>
       <button data-s="todo">To do</button>
       <button data-s="done">Done</button>
+      <button data-s="overdue">Overdue</button>
     </div>
 
     <main class="list" id="list"></main>
@@ -93,15 +124,26 @@
   <!-- JOURNAL -->
   <section class="view hide" id="view-journal">
     <h2 class="page-title">Journal</h2>
-    <p class="muted page-sub">Everything you've finished, with the memories attached.</p>
-    <div id="journal"></div>
+    <p class="muted page-sub">Memories from finished dreams, and what changed recently.</p>
+    <div id="memories"></div>
+    <h3 class="month">Activity</h3>
+    <div class="feed" id="feed"></div>
   </section>
 
   <!-- STATS -->
   <section class="view hide" id="view-stats">
     <h2 class="page-title">Stats</h2>
+    <p class="muted page-sub">How your list is growing.</p>
     <div id="stats"></div>
   </section>
+</div>
+
+<div class="bulkbar hide" id="bulkbar" role="toolbar" aria-label="Bulk actions">
+  <span id="bulkCount">0 selected</span>
+  <button data-bulk="done">✓ Done</button>
+  <button data-bulk="pin">★ Pin</button>
+  <button data-bulk="delete" class="danger-text">Delete</button>
+  <button data-bulk="cancel">Cancel</button>
 </div>
 
 <nav class="dock" id="dock" aria-label="Main">
@@ -136,9 +178,21 @@
     <label>Location<input class="field" name="location" maxlength="120"></label>
     <label>Link<input class="field" name="url" type="url" placeholder="https://" maxlength="300"></label>
     <label>Tags (comma separated)<input class="field" name="tags" placeholder="beach, summer, friends" maxlength="200"></label>
-    <label>Notes<textarea class="field" name="notes" rows="2"></textarea></label>
+    <div>
+      <label>Sticker emoji (optional)<input class="field" name="emoji" id="emojiInput" maxlength="8" placeholder="Pick one or type your own"></label>
+      <div class="emoji-presets" id="emojiPresets"></div>
+    </div>
+    <label>Notes<textarea class="field" name="notes" rows="2" maxlength="2000"></textarea></label>
     <label>Steps (one per line)<textarea class="field" name="steps" rows="3" placeholder="Check flight dates&#10;Book a hotel"></textarea></label>
-    <label>Memory, once it's done<textarea class="field" name="memory" rows="3" placeholder="How did it feel? What will you remember?"></textarea></label>
+
+    <label class="check-row"><input type="checkbox" name="done" id="doneCheck"> Mark as done</label>
+    <div id="starRow" class="hide">
+      <label>How did it go?</label>
+      <div class="stars" id="stars"></div>
+      <input type="hidden" name="rating" id="ratingInput">
+    </div>
+    <label>Memory<textarea class="field" name="memory" rows="3" maxlength="4000" placeholder="How did it feel? What will you remember?"></textarea></label>
+
     <div class="photo-box">
       <div class="photo-prev" id="photoPrev">No photo</div>
       <div class="photo-btns">
@@ -160,7 +214,8 @@
   <form class="dlg" id="profileForm">
     <h2>Edit profile</h2>
     <label>Name<input class="field" name="name" required maxlength="60"></label>
-    <label>Tagline<input class="field" name="tagline" maxlength="120"></label>
+    <label>Tagline<input class="field" name="tagline" maxlength="120" placeholder="Things I want to do before I run out of time"></label>
+    <label>Yearly goal (number of dreams to finish this year)<input class="field" name="goal" type="number" min="0" max="500" placeholder="0 = no goal"></label>
     <div class="photo-box">
       <div class="photo-prev" id="profPrev">No photo</div>
       <div class="photo-btns">
@@ -178,33 +233,18 @@
 <dialog id="menuDlg">
   <div class="dlg">
     <h2>Menu</h2>
+    <div>
+      <p class="muted">Palette</p>
+      <div class="palettes" id="palettes"></div>
+    </div>
     <nav class="menu">
-      <button data-m="random">🎲 Random dream</button>
-      <button data-m="share">🔗 Share list</button>
       <button data-m="json">⬇ Export backup (JSON)</button>
       <button data-m="csv">⬇ Export spreadsheet (CSV)</button>
-      <button data-m="import">⬆ Import backup</button>
+      <button data-m="import">⬆ Import backup (replaces list)</button>
       <button data-m="erase" class="danger-text">Erase everything</button>
     </nav>
-    <div>
-      <p class="muted">Accent color</p>
-      <div class="swatches" id="swatches"></div>
-    </div>
-    <p class="muted">Shortcuts: N new · / search · R random · T theme · 1 2 3 tabs</p>
+    <p class="muted">Shortcuts: N new · / search · S select · T light/dark · 1 2 3 tabs · Esc cancel selection</p>
     <div class="actions-row"><button class="btn ghost" data-close>Close</button></div>
-  </div>
-</dialog>
-
-<dialog id="randDlg">
-  <div class="dlg">
-    <small class="muted">Your next adventure</small>
-    <h2 id="randTitle"></h2>
-    <p class="muted" id="randMeta"></p>
-    <div class="actions-row">
-      <button class="btn ghost" data-close>Close</button>
-      <button class="btn ghost" id="randAgain">Another</button>
-      <button class="btn" id="randOpen">Open</button>
-    </div>
   </div>
 </dialog>
 

@@ -1,4 +1,4 @@
-const VERSION = "bucketlist-v4";
+const VERSION = "bucketlist-v6";
 const SHELL = [
   "/", "/index.html", "/styles.css", "/app.js", "/manifest.webmanifest",
   "/icons/icon-192.png", "/icons/icon-512.png", "/icons/apple-touch-icon.png"
@@ -16,12 +16,12 @@ self.addEventListener("activate", (e) => {
   );
 });
 
-// Network first, falling back to cache, so updates arrive quickly and the app still works offline.
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
-  if (new URL(req.url).origin !== self.location.origin) return;
-  if (new URL(req.url).pathname.startsWith("/api/")) return; // never cache account data
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/")) return; // account data is never cached
 
   e.respondWith(
     fetch(req)
