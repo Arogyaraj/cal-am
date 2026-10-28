@@ -1,22 +1,12 @@
 /* Bucket List v2 client. Every change is saved to Neon Postgres through /api. */
 const CATS = ["Travel","Adventure","Learning","Health","Career","Creative","Food","Experiences","Other"];
 const CAT_EMOJI = { Travel:"✈️", Adventure:"🏔️", Learning:"📚", Health:"💪", Career:"💼", Creative:"🎨", Food:"🍜", Experiences:"🎉", Other:"⭐" };
-const COVER = {
-  Travel:["#38bdf8","#6366f1"], Adventure:["#34d399","#0f766e"], Learning:["#fde047","#f97316"],
-  Health:["#fb7185","#db2777"], Career:["#94a3b8","#1e293b"], Creative:["#e879f9","#7c3aed"],
-  Food:["#fdba74","#ef4444"], Experiences:["#f9a8d4","#be185d"], Other:["#c4b5fd","#4c1d95"]
-};
 const PRIO = { high: 0, medium: 1, low: 2 };
 const KIND = {
   created: ["➕", "Added"], completed: ["🎉", "Completed"], reopened: ["↩️", "Reopened"],
   updated: ["✏️", "Edited"], memory: ["📝", "Memory added"], deleted: ["🗑️", "Deleted"]
 };
 const EMOJI_PRESETS = ["🌍","🏔️","🎸","🍣","🏋️","📚","🎨","🚀","🌅","💃","🐠","🎬","🏄","🎂","🛫","🧗"];
-const PALETTES = [
-  { id: "sunset", name: "Sunset", c: ["#ff6b6b", "#feca57", "#ff9ff3"] },
-  { id: "lagoon", name: "Lagoon", c: ["#14b8a6", "#38bdf8", "#a3e635"] },
-  { id: "grape",  name: "Grape",  c: ["#8b5cf6", "#ec4899", "#facc15"] }
-];
 const IDEAS = [
   "Watch the sunrise from a mountain", "Cook one dish from every continent",
   "Take a solo road trip", "Go stargazing somewhere really dark",
@@ -24,7 +14,6 @@ const IDEAS = [
 ];
 const PIN_KEY = "bl-pin";
 const MODE_KEY = "bl-mode";
-const PALETTE_KEY = "bl-palette";
 const LEGACY_KEYS = ["bucketlist-v3", "bucketlist-v2"];
 const DEFAULT_PROFILE = { name: "Your Name", tagline: "", photo: "", goal: 0 };
 
@@ -81,7 +70,6 @@ let dreams = [];
 let activity = [];
 let stats = null;
 let currentTab = "dreams";
-let currentPalette = localStorage.getItem(PALETTE_KEY) || "sunset";
 let filter = { cat: "All", tag: "", prio: "all", status: "all", q: "", sort: "priority", view: "grid" };
 let selecting = false;
 const selected = new Set();
@@ -91,6 +79,8 @@ let profPhoto;
 let inFlight = 0;
 let online = true;
 let nextId = null;
+let journalFilter = "all";
+let loading = false;
 
 /* ---------- Network ---------- */
 function setSync() {
@@ -380,8 +370,8 @@ function visible() {
 
 function coverHTML(d) {
   if (d.photo) return `<div class="cover"><img src="${esc(d.photo)}" alt="" loading="lazy"></div>`;
-  const [a, b] = COVER[d.category] || COVER.Other;
-  return `<div class="cover" style="background:linear-gradient(135deg,${a},${b})"><span class="sticker">${esc(d.emoji || CAT_EMOJI[d.category] || "⭐")}</span></div>`;
+  const pat = "pat-" + (Math.max(0, CATS.indexOf(d.category)) % 5);
+  return `<div class="cover ${pat}"><span class="sticker">${esc(d.emoji || CAT_EMOJI[d.category] || "⭐")}</span></div>`;
 }
 
 function card(d) {
@@ -443,6 +433,11 @@ function renderTimeline(arr) {
 
 function renderList() {
   const list = $("list");
+  if (loading) {
+    list.className = "list";
+    list.innerHTML = Array.from({ length: 3 }, () => `<div class="skel" aria-hidden="true"></div>`).join("");
+    return;
+  }
   const arr = visible();
   list.className = "list" + (filter.view !== "grid" ? " list-view" : "");
   if (!arr.length) {
@@ -468,20 +463,47 @@ function groupByMonth(arr, tsOf) {
   return Object.entries(groups);
 }
 
+function journalEntry(d) {
+  const dt = new Date(d.completedAt || Date.now());
+  const cat = `${d.emoji || CAT_EMOJI[d.category] || "⭐"} ${esc(d.category)}`;
+  return `<li class="tl-item">
+    <div class="tl-date"><b>${dt.getDate()}</b><span>${dt.toLocaleDateString(undefined, { month: "short" })}</span></div>
+    <article class="tl-card">
+      <div class="tl-top"><span class="mono">${cat}</span>${d.rating ? `<span class="stars-view tl-stars" aria-label="${d.rating} of 5">${starStr(d.rating)}</span>` : ""}</div>
+      <h4 class="tl-title">${esc(d.title)}</h4>
+      ${d.photo ? `<img class="tl-photo" src="${esc(d.photo)}" alt="" loading="lazy">` : ""}
+      ${d.memory
+        ? `<blockquote class="tl-quote">${esc(d.memory)}</blockquote>`
+        : `<button class="linkish" data-act="memory">Write the memory →</button>`}
+    </article>
+  </li>`;
+}
+
 function renderJournal() {
   const done = dreams.filter((d) => d.done).sort((a, b) => b.completedAt - a.completedAt);
-  $("memories").innerHTML = done.length
-    ? groupByMonth(done, (d) => d.completedAt).map(([label, arr]) => `
-        <h3 class="month">${label}</h3>
-        ${arr.map((d) => `
-          <article class="card entry" data-id="${d.id}">
-            <div class="dot">${esc(d.emoji || CAT_EMOJI[d.category] || "⭐")}</div>
-            <div>
-              <div class="entry-top"><strong>${esc(d.title)}</strong><span class="muted">${d.completedAt ? fmtDay(d.completedAt) : ""}${d.rating ? ` · <span class="stars-view" style="padding:0">${starStr(d.rating)}</span>` : ""}</span></div>
-              ${d.memory ? `<p>${esc(d.memory)}</p>` : `<p class="muted"><button class="linkish" data-act="memory">+ Add a memory</button></p>`}
-            </div>
-          </article>`).join("")}`).join("")
-    : `<div class="empty">Finish a dream and it lands here, with room for a memory.</div>`;
+  const remembered = done.filter((d) => d.memory).length;
+  const rated = done.filter((d) => d.rating);
+  const avg = rated.length ? (rated.reduce((sum, d) => sum + d.rating, 0) / rated.length).toFixed(1) : "—";
+  $("jStats").innerHTML = `
+    <div><b>${done.length}</b><span>Finished</span></div>
+    <div><b>${remembered}</b><span>Remembered</span></div>
+    <div><b>${avg}</b><span>Avg rating</span></div>`;
+  document.querySelectorAll("#jFilter [data-jf]").forEach((b) => b.classList.toggle("on", b.dataset.jf === journalFilter));
+
+  const shown = done.filter((d) =>
+    journalFilter === "all" || (journalFilter === "remembered" ? !!d.memory : !d.memory)
+  );
+  if (!done.length) {
+    $("memories").innerHTML = `<div class="empty">Finish a dream and it lands here, with room for a memory.</div>`;
+  } else if (!shown.length) {
+    $("memories").innerHTML = `<div class="empty">Nothing in this view yet.</div>`;
+  } else {
+    $("memories").innerHTML = groupByMonth(shown, (d) => d.completedAt).map(([label, arr]) => `
+      <section class="j-month">
+        <h3 class="j-label"><span>${label}</span><span>${arr.length} ${arr.length === 1 ? "entry" : "entries"}</span></h3>
+        <ol class="tl">${arr.map(journalEntry).join("")}</ol>
+      </section>`).join("");
+  }
 
   $("feed").innerHTML = activity.length
     ? activity.map((a) => {
@@ -891,37 +913,8 @@ $("profPhotoInput").addEventListener("change", async (e) => {
 });
 $("profRemove").onclick = () => { profPhoto = ""; renderProfPreview(""); };
 
-/* ---------- Menu: palettes, backup, export, erase ---------- */
-function renderPalettes() {
-  $("palettes").innerHTML = PALETTES.map((p) =>
-    `<button class="palette ${p.id === currentPalette ? "on" : ""}" data-pal="${p.id}">
-       <i style="background:linear-gradient(135deg,${p.c[0]},${p.c[1]})"></i>${p.name}
-     </button>`
-  ).join("");
-}
-
-function applyPalette() {
-  const p = PALETTES.find((x) => x.id === currentPalette) || PALETTES[0];
-  const root = document.documentElement.style;
-  root.setProperty("--accent", p.c[0]);
-  root.setProperty("--accent2", p.c[1]);
-  root.setProperty("--accent3", p.c[2]);
-  document.querySelector('meta[name="theme-color"]').content = p.c[0];
-}
-
-$("palettes").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-pal]");
-  if (!b) return;
-  currentPalette = b.dataset.pal;
-  try { localStorage.setItem(PALETTE_KEY, currentPalette); } catch {}
-  applyPalette();
-  renderPalettes();
-});
-
-$("menuBtn").onclick = () => {
-  renderPalettes();
-  $("menuDlg").showModal();
-};
+/* ---------- Menu: backup, export, erase ---------- */
+$("menuBtn").onclick = () => $("menuDlg").showModal();
 document.querySelectorAll("[data-m]").forEach((b) => (b.onclick = () => runMenu(b.dataset.m)));
 
 function runMenu(m) {
@@ -1054,19 +1047,53 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* ---------- Lock screen and start-up ---------- */
-function lockError(msg) { $("lockErr").textContent = msg || ""; }
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function unlock(p) {
-  const data = await call("GET", "/api/data", undefined, p);
-  pin = p;
-  sessionStorage.setItem(PIN_KEY, p);
+function lockError(msg) {
+  $("lockErr").textContent = msg || "";
+  if (!msg) return;
+  const card = document.querySelector(".lock-card");
+  card.classList.remove("shake");
+  void card.offsetWidth;
+  card.classList.add("shake");
+}
+
+function setLocking(on) {
+  $("lockBtn").disabled = on;
+  $("lockBtn").textContent = on ? "Checking…" : "Unlock";
+}
+
+function applyData(data) {
   profile = { ...DEFAULT_PROFILE, ...data.profile };
   dreams = data.dreams;
   activity = data.activity;
-  if (!dreams.length) await migrateLocal();
+}
+
+async function unlock(p) {
+  // The PIN check is a small request, so the app opens as soon as it passes.
+  await call("GET", "/api/ping", undefined, p);
+  pin = p;
+  sessionStorage.setItem(PIN_KEY, p);
+  document.documentElement.classList.remove("booting");
+
+  loading = true;
+  renderList();
+  $("lock").classList.add("leaving");
+  await sleep(200);
   document.body.classList.remove("locked");
-  render();
+  $("lock").classList.remove("leaving");
   setTab(currentTab);
+  render();
+
+  try {
+    applyData(await call("GET", "/api/data"));
+    if (!dreams.length) await migrateLocal();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    loading = false;
+    render();
+  }
   if (new URLSearchParams(location.search).has("new")) {
     history.replaceState(null, "", location.pathname);
     openItem(null);
@@ -1081,10 +1108,7 @@ async function migrateLocal() {
   if (!legacy) return;
   await call("POST", "/api/import", { profile: legacy.profile, items: legacy.items });
   LEGACY_KEYS.forEach((k) => localStorage.removeItem(k));
-  const data = await call("GET", "/api/data");
-  profile = { ...DEFAULT_PROFILE, ...data.profile };
-  dreams = data.dreams;
-  activity = data.activity;
+  applyData(await call("GET", "/api/data"));
   toast("Your older local list was moved to the database");
 }
 
@@ -1092,7 +1116,7 @@ $("lockForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const p = $("pinInput").value.trim();
   if (!p) return;
-  $("lockBtn").disabled = true;
+  setLocking(true);
   lockError("");
   try {
     await unlock(p);
@@ -1100,24 +1124,35 @@ $("lockForm").addEventListener("submit", async (e) => {
   } catch (err) {
     lockError(err.message);
     $("pinInput").select();
-    await new Promise((r) => setTimeout(r, 700));
   } finally {
-    $("lockBtn").disabled = false;
+    setLocking(false);
   }
 });
 
 async function boot() {
-  if (!pin) return;
+  if (!pin) {
+    document.documentElement.classList.remove("booting");
+    return;
+  }
   try {
     await unlock(pin);
   } catch (err) {
-    pin = "";
-    if (err.code === 401) sessionStorage.removeItem(PIN_KEY);
+    if (err.code === 401) {
+      pin = "";
+      sessionStorage.removeItem(PIN_KEY);
+    }
+    document.documentElement.classList.remove("booting");
     lockError(err.code === 401 ? "Your PIN has changed. Enter it again." : err.message);
   }
 }
 
-applyPalette();
+$("jFilter").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-jf]");
+  if (!b) return;
+  journalFilter = b.dataset.jf;
+  renderJournal();
+});
+
 initMode();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));

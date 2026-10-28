@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bucket List</title>
 <meta name="description" content="Plan, track and celebrate the things you want to do.">
-<meta name="theme-color" content="#ff6b6b">
+<meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,26 +15,19 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;600;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script>if (sessionStorage.getItem("bl-pin")) document.documentElement.classList.add("booting");</script>
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="locked">
 
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" style="stop-color:var(--accent)"/>
-      <stop offset="1" style="stop-color:var(--accent2)"/>
-    </linearGradient>
-  </defs>
-</svg>
-
 <section id="lock" class="lock" aria-live="polite">
   <form class="lock-card card" id="lockForm">
+    <p class="lock-boot" id="lockBoot">Opening your list…</p>
     <div class="lock-ico">🔒</div>
     <h2>Enter your PIN</h2>
     <p class="muted">Your list lives in the database and opens only with your PIN.</p>
-    <input id="pinInput" class="field pin-input" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="••••" required>
+    <input id="pinInput" class="field pin-input" type="password" inputmode="numeric" autocomplete="current-password" enterkeyhint="go" maxlength="12" placeholder="••••" required>
     <p class="lock-err" id="lockErr"></p>
     <button class="btn" id="lockBtn" type="submit">Unlock</button>
   </form>
@@ -124,11 +117,23 @@
 
   <!-- JOURNAL -->
   <section class="view hide" id="view-journal">
-    <h2 class="page-title">Journal</h2>
-    <p class="muted page-sub">Memories from finished dreams, and what changed recently.</p>
+    <header class="j-head">
+      <div>
+        <p class="mono kicker">Your story so far</p>
+        <h2 class="page-title">Journal</h2>
+      </div>
+      <div class="j-stats" id="jStats"></div>
+    </header>
+    <div class="seg j-seg" id="jFilter" role="group" aria-label="Filter journal">
+      <button class="on" data-jf="all">All</button>
+      <button data-jf="remembered">Remembered</button>
+      <button data-jf="missing">Needs memory</button>
+    </div>
     <div id="memories"></div>
-    <h3 class="month">Activity</h3>
-    <div class="feed" id="feed"></div>
+    <details class="activity">
+      <summary class="mono">Activity log</summary>
+      <div class="feed" id="feed"></div>
+    </details>
   </section>
 
   <!-- STATS -->
@@ -234,17 +239,13 @@
 <dialog id="menuDlg">
   <div class="dlg">
     <h2>Menu</h2>
-    <div>
-      <p class="muted">Palette</p>
-      <div class="palettes" id="palettes"></div>
-    </div>
     <nav class="menu">
       <button data-m="json">⬇ Export backup (JSON)</button>
       <button data-m="csv">⬇ Export spreadsheet (CSV)</button>
       <button data-m="import">⬆ Import backup (replaces list)</button>
       <button data-m="erase" class="danger-text">Erase everything</button>
     </nav>
-    <p class="muted">Shortcuts: N new · / search · S select · T light/dark · 1 2 3 tabs · Esc cancel selection</p>
+    <p class="muted">Shortcuts: N new · / search · S select · T light/dark · 1 2 3 tabs · Esc cancel</p>
     <div class="actions-row"><button class="btn ghost" data-close>Close</button></div>
   </div>
 </dialog>

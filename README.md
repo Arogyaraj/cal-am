@@ -1,9 +1,9 @@
-# Bucket List v2
+# Bucket List v2: monochrome edition
 
 An installable bucket list app. Data lives in a Neon Postgres database on Vercel, unlocked with a PIN.
 
 ## What's new in v2
-- Redesigned look: glass cards on a mesh gradient, grain texture, and bold display type. Three palettes (Sunset, Lagoon, Grape) and light/dark mode.
+- Black-and-white block design: square cards with hard shadows, patterned covers, monochrome emoji stickers, and a light/dark mode.
 - Sticker emoji per dream, with quick picks.
 - Star ratings and a "Mark as done" option in the editor.
 - Yearly goal shown in the hero, set from your profile.
