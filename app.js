@@ -184,7 +184,7 @@ async function patchDream(d, fields) {
 async function toggleDone(d) {
   const done = !d.done;
   const ok = await patchDream(d, { done, rating: done ? d.rating : null });
-  if (ok && done) toast("🎉 One more dream checked off!", { label: "Rate & remember", run: () => openItem(findDream(d.id)) });
+  if (ok && done) toast("🎉 One more dream checked off!", { label: "Rate & remember", run: () => { const it = findDream(d.id); if (it) openItem(it); } });
 }
 
 async function duplicate(d) {
@@ -468,7 +468,7 @@ function journalEntry(d) {
   const cat = `${d.emoji || CAT_EMOJI[d.category] || "⭐"} ${esc(d.category)}`;
   return `<li class="tl-item">
     <div class="tl-date"><b>${dt.getDate()}</b><span>${dt.toLocaleDateString(undefined, { month: "short" })}</span></div>
-    <article class="tl-card">
+    <article class="tl-card" data-id="${d.id}">
       <div class="tl-top"><span class="mono">${cat}</span>${d.rating ? `<span class="stars-view tl-stars" aria-label="${d.rating} of 5">${starStr(d.rating)}</span>` : ""}</div>
       <h4 class="tl-title">${esc(d.title)}</h4>
       ${d.photo ? `<img class="tl-photo" src="${esc(d.photo)}" alt="" loading="lazy">` : ""}
@@ -516,25 +516,46 @@ function renderJournal() {
     : `<div class="empty">No activity yet.</div>`;
 }
 
-function hbarRow(label, done, total, max) {
-  return `<div class="hbar">
+function brow(label, value, total, max) {
+  const outer = max ? (total / max) * 100 : 0;
+  const inner = total ? (value / total) * 100 : 0;
+  return `<div class="brow">
     <span>${label}</span>
-    <div class="hbar-wrap"><div class="hbar-total" style="width:${(total / max) * 100}%"><div class="hbar-done" style="width:${total ? (done / total) * 100 : 0}%"></div></div></div>
-    <b>${done}/${total}</b>
-  </div>`;
-}
-
-function valueRow(label, value, max) {
-  return `<div class="hbar">
-    <span>${label}</span>
-    <div class="hbar-wrap"><div class="hbar-total" style="width:${(value / max) * 100}%"><div class="hbar-done" style="width:${(value / max) * 100}%"></div></div></div>
+    <div class="bar"><em style="width:${outer}%"><i style="width:${inner}%"></i></em></div>
     <b>${value}</b>
   </div>`;
 }
 
 function renderStats() {
-  if (!stats) return;
-  const pct = stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
+  const total = dreams.length;
+  const done = dreams.filter((d) => d.done).length;
+  const open = total - done;
+  const year = new Date().getFullYear();
+  const doneYear = dreams.filter((d) => d.done && d.completedAt && new Date(d.completedAt).getFullYear() === year).length;
+  $("statsSummary").innerHTML = `
+    <div><b>${total}</b><span>Dreams</span></div>
+    <div><b>${done}</b><span>Done</span></div>
+    <div><b>${open}</b><span>Open</span></div>`;
+
+  if (!stats) {
+    $("stats").innerHTML = `<div class="empty">Loading the numbers…</div>`;
+    return;
+  }
+
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const goal = profile.goal || 0;
+  const top = stats.byCategory.filter((c) => c.done > 0).sort((a, b) => b.done - a.done)[0];
+  const metrics = [
+    ["Completion", `${pct}<small>%</small>`],
+    ["Done this year", doneYear],
+    ["Avg. days to finish", stats.avgDays ?? "—"],
+    ["Avg. rating", stats.avgRating ? `${Number(stats.avgRating).toFixed(1)}<small>★</small>` : "—"],
+    ["Open", open],
+    ["Overdue", stats.overdue ?? 0],
+    ["Yearly goal", goal ? `${doneYear}<small>/ ${goal}</small>` : "—"],
+    ["Top category", top ? `${CAT_EMOJI[top.category] || "⭐"}<small>${esc(top.category)}</small>` : "—"]
+  ];
+
   const now = new Date();
   const months = [];
   for (let k = 11; k >= 0; k--) {
@@ -542,53 +563,64 @@ function renderStats() {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     months.push({ key, label: d.toLocaleDateString(undefined, { month: "short" }), n: 0 });
   }
-  stats.monthly.forEach((m) => {
+  (stats.monthly || []).forEach((m) => {
     const x = months.find((z) => z.key === m.month);
     if (x) x.n = m.n;
   });
+  const monthTotal = months.reduce((sum, m) => sum + m.n, 0);
   const maxM = Math.max(1, ...months.map((m) => m.n));
   const maxCat = Math.max(1, ...stats.byCategory.map((c) => c.total));
   const maxPrio = Math.max(1, ...stats.byPriority.map((p) => p.total));
   const prio = ["high", "medium", "low"].map((k) => stats.byPriority.find((p) => p.priority === k)).filter(Boolean);
   const ratings = [5, 4, 3, 2, 1].map((n) => ({ n, c: dreams.filter((d) => d.rating === n).length }));
   const maxR = Math.max(1, ...ratings.map((r) => r.c));
-  const topCat = stats.byCategory.filter((c) => c.done > 0).sort((a, b) => b.done - a.done)[0];
+  const rated = ratings.reduce((sum, r) => sum + r.c, 0);
 
   $("stats").innerHTML = `
-    <div class="stat-grid">
-      <div class="card kpi"><span>Completion</span><b>${pct}%</b></div>
-      <div class="card kpi"><span>Done this year</span><b>${stats.doneYear}</b></div>
-      <div class="card kpi"><span>Avg. days to finish</span><b>${stats.avgDays ?? "—"}</b></div>
-      <div class="card kpi"><span>Avg. rating</span><b>${stats.avgRating ? stats.avgRating.toFixed(1) : "—"}${stats.avgRating ? ' <small>★</small>' : ""}</b></div>
-      <div class="card kpi"><span>Overdue</span><b>${stats.overdue}</b></div>
-      <div class="card kpi"><span>Top category</span><b><small>${topCat ? `${CAT_EMOJI[topCat.category]} ${esc(topCat.category)}` : "—"}</small></b></div>
-    </div>
-    <section class="card panel">
-      <h3>Completed per month</h3>
-      <div class="bars">${months.map((m) => `
-        <div class="bar-col">
-          <div class="bar-val">${m.n || ""}</div>
-          <div class="bar-track"><div class="bar-fill" style="height:${(m.n / maxM) * 100}%"></div></div>
-          <small>${m.label}</small>
+    <div class="metric-grid">${metrics.map(([label, val]) => `<div class="metric"><span>${label}</span><b>${val}</b></div>`).join("")}</div>
+
+    ${goal ? `<section class="goal-block">
+      <div class="goal-head"><span class="mono">${year} goal</span><b>${doneYear} / ${goal}</b></div>
+      <div class="goal-track"><i style="width:${Math.min(100, (doneYear / goal) * 100)}%"></i></div>
+    </section>` : ""}
+
+    <section class="panel-block">
+      <header class="sec-h"><h3>Completed, last 12 months</h3><span class="mono">${monthTotal} total</span></header>
+      <div class="chart">${months.map((m) => `
+        <div class="chart-col">
+          <span class="chart-val">${m.n || ""}</span>
+          <div class="chart-track"><div class="chart-fill" style="height:${(m.n / maxM) * 100}%"></div></div>
+          <small class="mono">${m.label}</small>
         </div>`).join("")}
       </div>
     </section>
-    <section class="card panel">
-      <h3>By category</h3>
-      ${stats.byCategory.length
-        ? stats.byCategory.map((c) => hbarRow(`${CAT_EMOJI[c.category] || "⭐"} ${esc(c.category)}`, c.done, c.total, maxCat)).join("")
-        : `<p class="muted">No data yet.</p>`}
-    </section>
-    <section class="card panel">
-      <h3>By priority</h3>
-      ${prio.length
-        ? prio.map((p) => hbarRow(`● ${esc(p.priority)}`, p.done, p.total, maxPrio)).join("")
-        : `<p class="muted">No data yet.</p>`}
-    </section>
-    <section class="card panel">
-      <h3>How you rated them</h3>
-      ${ratings.some((r) => r.c) ? ratings.map((r) => valueRow(`<span class="stars-view" style="padding:0">${starStr(r.n)}</span>`, r.c, maxR)).join("") : `<p class="muted">Rate a finished dream to see this.</p>`}
-    </section>`;
+
+    <div class="panel-grid">
+      <section class="panel-block">
+        <header class="sec-h"><h3>By category</h3><span class="mono">done / total</span></header>
+        ${stats.byCategory.length
+          ? stats.byCategory.map((c) => brow(`${CAT_EMOJI[c.category] || "⭐"} ${esc(c.category)}`, c.done, c.total, maxCat)).join("")
+          : `<p class="muted">No data yet.</p>`}
+      </section>
+      <section class="panel-block">
+        <header class="sec-h"><h3>By priority</h3><span class="mono">done / total</span></header>
+        ${prio.length
+          ? prio.map((p) => brow(esc(p.priority), p.done, p.total, maxPrio)).join("")
+          : `<p class="muted">No data yet.</p>`}
+      </section>
+      <section class="panel-block">
+        <header class="sec-h"><h3>Ratings</h3><span class="mono">${rated} rated</span></header>
+        ${rated
+          ? ratings.map((r) => brow(`<span class="stars-view inline">${starStr(r.n)}</span>`, r.c, r.c || 1, maxR)).join("")
+          : `<p class="muted">Rate a finished dream to see this.</p>`}
+      </section>
+    </div>`;
+}
+
+let statsTimer = null;
+function scheduleStats() {
+  clearTimeout(statsTimer);
+  statsTimer = setTimeout(loadStats, 150);
 }
 
 function renderBulk() {
@@ -606,7 +638,10 @@ function render() {
   renderList();
   renderBulk();
   if (currentTab === "journal") renderJournal();
-  if (currentTab === "stats") renderStats();
+  if (currentTab === "stats") {
+    renderStats();
+    scheduleStats();
+  }
 }
 
 /* ---------- Tabs ---------- */
@@ -700,8 +735,8 @@ $("list").addEventListener("click", (e) => {
 
 $("memories").addEventListener("click", (e) => {
   const b = e.target.closest("[data-act='memory']");
-  if (!b) return;
-  const d = findDream(b.closest("[data-id]").dataset.id);
+  const card = b && b.closest("[data-id]");
+  const d = card && findDream(card.dataset.id);
   if (d) openItem(d);
 });
 
@@ -1027,6 +1062,20 @@ $("installBtn").onclick = async () => {
 };
 
 /* ---------- Keyboard shortcuts ---------- */
+/* True only when a visible text field has focus; fields inside closed dialogs never count. */
+function isTyping() {
+  const el = document.activeElement;
+  if (!el || !/INPUT|TEXTAREA|SELECT/.test(el.tagName)) return false;
+  const dlg = el.closest("dialog");
+  if (dlg && !dlg.open) return false;
+  return el.getClientRects().length > 0;
+}
+/* When a dialog closes, release focus from its fields so shortcuts work again */
+document.querySelectorAll("dialog").forEach((d) =>
+  d.addEventListener("close", () => {
+    if (d.contains(document.activeElement)) document.activeElement.blur();
+  })
+);
 document.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (document.body.classList.contains("locked")) return;
@@ -1035,7 +1084,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   if (document.querySelector("dialog[open]")) return;
-  if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (isTyping()) return;
   const k = e.key.toLowerCase();
   if (k === "n") { e.preventDefault(); openItem(null); }
   else if (k === "/") { e.preventDefault(); setTab("dreams"); $("search").focus(); }

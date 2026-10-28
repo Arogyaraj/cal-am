@@ -1,4 +1,4 @@
-# Bucket List v2: monochrome edition
+# Bucket List v3
 
 An installable bucket list app. Data lives in a Neon Postgres database on Vercel, unlocked with a PIN.
 
@@ -33,3 +33,10 @@ An installable bucket list app. Data lives in a Neon Postgres database on Vercel
 - Every create, edit, completion, reopen, memory, and delete is recorded in the activity log.
 - The PIN is kept in session storage and cleared when the tab closes.
 - Four-digit PINs are guessable. The rate limit (5 wrong tries per address per 15 minutes) slows that down, but a longer PIN is safer.
+
+## What changed in v3
+- Fixed the journal crash when writing a memory from an entry.
+- Journal and stats now share one editorial layout, with summary figures and filters.
+- Stats: eight headline metrics, a yearly goal bar, a twelve-month chart, and category, priority, and rating breakdowns.
+- Keyboard shortcuts no longer stop working after a dialog closes.
+- Every interactive control was clicked in an automated run across phone, tablet, and desktop sizes with no page errors.
